@@ -11,6 +11,7 @@ import { AnimeUnityConfig } from "./types/animeunity";
 import { execFile } from 'child_process';
 import * as crypto from 'crypto';
 import * as util from 'util';
+import process from 'process';
 
 // Promisify execFile
 const execFilePromise = util.promisify(execFile);
@@ -810,9 +811,12 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                         console.error('AnimeSaturn error:', error);
                     }
                 }
-                return { streams: allStreams };
+                if (allStreams.length > 0) {
+                    return { streams: allStreams };
+                }
+                // Fallback VixSrc se nessuno stream trovato
             }
-            // VixSrc (film/serie)
+            // VixSrc (film/serie) fallback
             if (!id.startsWith('tv:') && !id.startsWith('kitsu:') && !id.startsWith('mal:')) {
                 console.log(`[VixSrc] Processing ID: ${id}, type: ${type}`);
                 const finalConfig: ExtractorConfig = {
