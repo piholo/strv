@@ -614,8 +614,6 @@ function createBuilder(initialConfig: AddonConfig = {}) {
     builder.defineCatalogHandler(async ({ type, id, extra }: { type: string; id: string; extra?: any }) => {
         if (type === "tv") {
             let filteredChannels = tvChannels;
-
-            // Filtro per categoria/genre
             if (extra && extra.genre) {
                 const genreMap: { [key: string]: string } = {
                     "RAI": "rai",
@@ -636,8 +634,6 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                     });
                 }
             }
-
-            // Prepara i metadati per Stremio
             const tvChannelsWithPrefix = filteredChannels.map((channel: any) => ({
                 ...channel,
                 id: `tv:${channel.id}`,
@@ -646,16 +642,21 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                 logo: channel.logo || channel.poster || '',
                 background: channel.background || channel.poster || ''
             }));
-
             return { metas: tvChannelsWithPrefix };
         }
         return { metas: [] };
     });
 
+    // === HANDLER META ===
+    builder.defineMetaHandler(async ({ type, id }: { type: string; id: string }) => {
+        // Logica minimale: nessun meta se non implementato
+        return { meta: null };
+    });
+
     // === HANDLER STREAM ===
     builder.defineStreamHandler(
         async ({ id, type }: { id: string; type: string }): Promise<{ streams: Stream[] }> => {
-            // Esempio minimale: nessuno stream per default
+            // Logica minimale: nessuno stream per default
             return { streams: [] };
         }
     );
