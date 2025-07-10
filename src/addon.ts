@@ -127,7 +127,30 @@ app.listen(PORT, () => {
     console.log(`Addon server running on http://127.0.0.1:${PORT}`);
 });
 
-// PATCH: Modifica createBuilder per accettare il flag epgEnabled
+// EPG Manager lazy (on demand)
+let epgManager: EPGManager | null = null;
+let epgConfig: any = null;
+
+// Carica la configurazione EPG solo quando serve
+function ensureEPGManager() {
+    if (!epgManager) {
+        if (!epgConfig) {
+            try {
+                epgConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../config/epg_config.json'), 'utf-8'));
+            } catch (e) {
+                console.error('❌ Errore nel caricamento epg_config.json:', e);
+                return null;
+            }
+        }
+        if (epgConfig && epgConfig.enabled) {
+            epgManager = new EPGManager(epgConfig);
+            console.log(`📺 EPG Manager inizializzato ON DEMAND con URL: ${epgConfig.epgUrl}`);
+        }
+    }
+    return epgManager;
+}
+
+// PATCH: Modifica createBuilder per EPG lazy
 function createBuilder(initialConfig: AddonConfig = {}, epgEnabled: boolean = true) {
     const manifest = loadCustomConfig();
     if (initialConfig.mediaFlowProxyUrl || initialConfig.bothLinks || initialConfig.tmdbApiKey) {
@@ -138,7 +161,11 @@ function createBuilder(initialConfig: AddonConfig = {}, epgEnabled: boolean = tr
     // === HANDLER CATALOGO TV ===
     builder.defineCatalogHandler(async ({ type, id, extra }: { type: string; id: string; extra?: any }) => {
         // ...
-        // PATCH: EPG opzionale
+        // PATCH: EPG opzionale e lazy
+        let localEpgManager: EPGManager | null = null;
+        if (epgEnabled) {
+            localEpgManager = ensureEPGManager();
+        }
         const tvChannelsWithPrefix = await Promise.all(filteredChannels.map(async (channel: any) => {
             const channelWithPrefix = {
                 ...channel,
@@ -148,16 +175,16 @@ function createBuilder(initialConfig: AddonConfig = {}, epgEnabled: boolean = tr
                 logo: (channel as any).logo || (channel as any).poster || '',
                 background: (channel as any).background || (channel as any).poster || ''
             };
-            // PATCH: Solo se epgEnabled
-            if (epgEnabled && epgManager) {
+            // PATCH: Solo se epgEnabled e EPG caricato
+            if (epgEnabled && localEpgManager) {
                 try {
                     const epgChannelIds = (channel as any).epgChannelIds;
-                    const epgChannelId = epgManager.findEPGChannelId(channel.name, epgChannelIds);
+                    const epgChannelId = localEpgManager.findEPGChannelId(channel.name, epgChannelIds);
                     if (epgChannelId) {
-                        const currentProgram = await epgManager.getCurrentProgram(epgChannelId);
+                        const currentProgram = await localEpgManager.getCurrentProgram(epgChannelId);
                         if (currentProgram) {
-                            const startTime = epgManager.formatTime(currentProgram.start);
-                            const endTime = currentProgram.stop ? epgManager.formatTime(currentProgram.stop) : '';
+                            const startTime = localEpgManager.formatTime(currentProgram.start);
+                            const endTime = currentProgram.stop ? localEpgManager.formatTime(currentProgram.stop) : '';
                             const epgInfo = `🔴 ORA: ${currentProgram.title} (${startTime}${endTime ? `-${endTime}` : ''})`;
                             channelWithPrefix.description = `${channel.description || ''}\n\n${epgInfo}`;
                         }
@@ -174,31 +201,35 @@ function createBuilder(initialConfig: AddonConfig = {}, epgEnabled: boolean = tr
     // === HANDLER META ===
     builder.defineMetaHandler(async ({ type, id }: { type: string; id: string }) => {
         // ...
+        let localEpgManager: EPGManager | null = null;
+        if (epgEnabled) {
+            localEpgManager = ensureEPGManager();
+        }
         if (type === "tv") {
             // ...
             const channel = tvChannels.find((c: any) => c.id === cleanId);
             if (channel) {
                 // ...
-                // PATCH: Solo se epgEnabled
-                if (epgEnabled && epgManager) {
+                // PATCH: Solo se epgEnabled e EPG caricato
+                if (epgEnabled && localEpgManager) {
                     try {
                         const epgChannelIds = (channel as any).epgChannelIds;
-                        const epgChannelId = epgManager.findEPGChannelId(channel.name, epgChannelIds);
+                        const epgChannelId = localEpgManager.findEPGChannelId(channel.name, epgChannelIds);
                         if (epgChannelId) {
-                            const currentProgram = await epgManager.getCurrentProgram(epgChannelId);
-                            const nextProgram = await epgManager.getNextProgram(epgChannelId);
+                            const currentProgram = await localEpgManager.getCurrentProgram(epgChannelId);
+                            const nextProgram = await localEpgManager.getNextProgram(epgChannelId);
                             let epgDescription = channel.description || '';
                             if (currentProgram) {
-                                const startTime = epgManager.formatTime(currentProgram.start);
-                                const endTime = currentProgram.stop ? epgManager.formatTime(currentProgram.stop) : '';
+                                const startTime = localEpgManager.formatTime(currentProgram.start);
+                                const endTime = currentProgram.stop ? localEpgManager.formatTime(currentProgram.stop) : '';
                                 epgDescription += `\n\n🔴 IN ONDA ORA (${startTime}${endTime ? `-${endTime}` : ''}): ${currentProgram.title}`;
                                 if (currentProgram.description) {
                                     epgDescription += `\n${currentProgram.description}`;
                                 }
                             }
                             if (nextProgram) {
-                                const nextStartTime = epgManager.formatTime(nextProgram.start);
-                                const nextEndTime = nextProgram.stop ? epgManager.formatTime(nextProgram.stop) : '';
+                                const nextStartTime = localEpgManager.formatTime(nextProgram.start);
+                                const nextEndTime = nextProgram.stop ? localEpgManager.formatTime(nextProgram.stop) : '';
                                 epgDescription += `\n\n⏭️ A SEGUIRE (${nextStartTime}${nextEndTime ? `-${nextEndTime}` : ''}): ${nextProgram.title}`;
                                 if (nextProgram.description) {
                                     epgDescription += `\n${nextProgram.description}`;
