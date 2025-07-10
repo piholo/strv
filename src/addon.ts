@@ -8,7 +8,6 @@ import { AnimeUnityProvider } from './providers/animeunity-provider';
 import { KitsuProvider } from './providers/kitsu'; 
 import { formatMediaFlowUrl } from './utils/mediaflow';
 import { AnimeUnityConfig } from "./types/animeunity";
-import { EPGManager } from './utils/epg';
 import { execFile } from 'child_process';
 import * as crypto from 'crypto';
 import * as util from 'util';
