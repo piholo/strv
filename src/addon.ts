@@ -1180,13 +1180,20 @@ function createBuilder(initialConfig: AddonConfig = {}) {
 
 // Funzione per determinare se EPG è abilitato (query string > config > default)
 function isEpgEnabled(req?: Request): boolean {
+    function normalize(val: any): boolean {
+        if (Array.isArray(val)) val = val[0];
+        if (typeof val === 'undefined') return true; // default ON
+        if (val === true || val === '1' || val === 1 || val === 'true' || val === 'on') return true;
+        if (val === false || val === '0' || val === 0 || val === 'false' || val === 'off') return false;
+        return Boolean(val);
+    }
     // 1. Query string
     if (req && req.query && typeof req.query.epg !== 'undefined') {
-        return req.query.epg === '1' || req.query.epg === 1 || req.query.epg === true || req.query.epg === 'true';
+        return normalize(req.query.epg);
     }
     // 2. Config globale
     if (typeof configCache.epgEnabled !== 'undefined') {
-        return configCache.epgEnabled === 'on' || configCache.epgEnabled === true || configCache.epgEnabled === '1';
+        return normalize(configCache.epgEnabled);
     }
     // 3. Default: abilitato
     return true;
