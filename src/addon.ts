@@ -652,6 +652,14 @@ function createBuilder(initialConfig: AddonConfig = {}) {
         return { metas: [] };
     });
 
+    // === HANDLER STREAM ===
+    builder.defineStreamHandler(
+        async ({ id, type }: { id: string; type: string }): Promise<{ streams: Stream[] }> => {
+            // Esempio minimale: nessuno stream per default
+            return { streams: [] };
+        }
+    );
+
     return builder;
 }
 
