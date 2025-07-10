@@ -1,5 +1,4 @@
 import { addonBuilder, getRouter, Manifest, Stream } from "stremio-addon-sdk";
-import { getStreamContent, VixCloudStreamInfo, ExtractorConfig } from "./extractor";
 import * as fs from 'fs';
 import { landingTemplate } from './landingPage';
 import * as path from 'path';
@@ -814,36 +813,6 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                 if (allStreams.length > 0) {
                     return { streams: allStreams };
                 }
-                // Fallback VixSrc se nessuno stream trovato
-            }
-            // VixSrc (film/serie) fallback
-            if (!id.startsWith('tv:') && !id.startsWith('kitsu:') && !id.startsWith('mal:')) {
-                console.log(`[VixSrc] Processing ID: ${id}, type: ${type}`);
-                const finalConfig: ExtractorConfig = {
-                    tmdbApiKey: config.tmdbApiKey || process.env.TMDB_API_KEY,
-                    mfpUrl: config.mediaFlowProxyUrl || process.env.MFP_URL,
-                    mfpPsw: config.mediaFlowProxyPassword || process.env.MFP_PSW,
-                    bothLink: bothLinkValue
-                };
-                console.log(`[VixSrc] Config:`, finalConfig);
-                const res: VixCloudStreamInfo[] | null = await getStreamContent(id, type, finalConfig);
-                let allStreams: Stream[] = [];
-                if (res) {
-                    for (const st of res) {
-                        if (st.streamUrl == null) continue;
-                        allStreams.push({
-                            title: st.name,
-                            name: 'StreamViX Vx',
-                            url: st.streamUrl,
-                            behaviorHints: {
-                                notWebReady: true,
-                                headers: { "Referer": st.referer },
-                            },
-                        });
-                    }
-                }
-                console.log(`[VixSrc] Streams found:`, allStreams.length);
-                return { streams: allStreams };
             }
             return { streams: [] };
         }
