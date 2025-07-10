@@ -28,6 +28,7 @@ interface AddonConfig {
   mfpProxyUrl?: string;
   mfpProxyPassword?: string;
   tvProxyUrl?: string;
+  epgEnabled?: string; // AGGIUNTA: Opzione EPG
   [key: string]: any;
 }
 
@@ -148,6 +149,12 @@ const baseManifest: Manifest = {
             key: "tvProxyUrl",
             title: "TV Proxy URL",
             type: "text"
+        },
+        // AGGIUNTA: Opzione EPG
+        {
+            key: "epgEnabled",
+            title: "Abilita EPG (Guida programmi)",
+            type: "checkbox"
         }
     ]
 };
@@ -1171,6 +1178,20 @@ function createBuilder(initialConfig: AddonConfig = {}) {
     return builder;
 }
 
+// Funzione per determinare se EPG è abilitato (query string > config > default)
+function isEpgEnabled(req?: Request): boolean {
+    // 1. Query string
+    if (req && req.query && typeof req.query.epg !== 'undefined') {
+        return req.query.epg === '1' || req.query.epg === 1 || req.query.epg === true || req.query.epg === 'true';
+    }
+    // 2. Config globale
+    if (typeof configCache.epgEnabled !== 'undefined') {
+        return configCache.epgEnabled === 'on' || configCache.epgEnabled === true || configCache.epgEnabled === '1';
+    }
+    // 3. Default: abilitato
+    return true;
+}
+
 // Server Express
 const app = express();
 
@@ -1239,6 +1260,39 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     
     // USA SEMPRE il router globale
     globalRouter(req, res, next);
+});
+
+// Inizializzazione EPGManager SOLO se abilitato
+if (isEpgEnabled()) {
+    try {
+        const EPGManagerClass = require('./utils/epg').EPGManager;
+        epgManager = new EPGManagerClass(epgConfig);
+        console.log('✅ EPG Manager inizializzato (default)');
+    } catch (e) {
+        console.error('❌ Errore inizializzazione EPGManager:', e);
+    }
+} else {
+    epgManager = null;
+    console.log('ℹ️ EPG disabilitato all’avvio');
+}
+
+// Middleware Express: aggiorna epgManager se cambia la config/query
+app.use((req: Request, res: Response, next: NextFunction) => {
+    // Aggiorna epgManager se necessario
+    const epgShouldBeEnabled = isEpgEnabled(req);
+    if (epgShouldBeEnabled && !epgManager) {
+        try {
+            const EPGManagerClass = require('./utils/epg').EPGManager;
+            epgManager = new EPGManagerClass(epgConfig);
+            console.log('✅ EPG Manager inizializzato (on request)');
+        } catch (e) {
+            console.error('❌ Errore inizializzazione EPGManager:', e);
+        }
+    } else if (!epgShouldBeEnabled && epgManager) {
+        epgManager = null;
+        console.log('ℹ️ EPG disabilitato (on request)');
+    }
+    // ... existing code ...
 });
 
 const PORT = process.env.PORT || 7860;
