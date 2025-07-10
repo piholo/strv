@@ -813,13 +813,15 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                 return { streams: allStreams };
             }
             // VixSrc (film/serie)
-            if (!id.startsWith('kitsu:') && !id.startsWith('mal:') && !id.startsWith('tv:')) {
+            if (!id.startsWith('tv:') && !id.startsWith('kitsu:') && !id.startsWith('mal:')) {
+                console.log(`[VixSrc] Processing ID: ${id}, type: ${type}`);
                 const finalConfig: ExtractorConfig = {
                     tmdbApiKey: config.tmdbApiKey || process.env.TMDB_API_KEY,
                     mfpUrl: config.mediaFlowProxyUrl || process.env.MFP_URL,
                     mfpPsw: config.mediaFlowProxyPassword || process.env.MFP_PSW,
                     bothLink: bothLinkValue
                 };
+                console.log(`[VixSrc] Config:`, finalConfig);
                 const res: VixCloudStreamInfo[] | null = await getStreamContent(id, type, finalConfig);
                 let allStreams: Stream[] = [];
                 if (res) {
@@ -836,6 +838,7 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                         });
                     }
                 }
+                console.log(`[VixSrc] Streams found:`, allStreams.length);
                 return { streams: allStreams };
             }
             return { streams: [] };
