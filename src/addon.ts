@@ -610,6 +610,48 @@ function createBuilder(initialConfig: AddonConfig = {}) {
     
     const builder = new addonBuilder(manifest);
 
+    // === HANDLER CATALOGO TV ===
+    builder.defineCatalogHandler(async ({ type, id, extra }: { type: string; id: string; extra?: any }) => {
+        if (type === "tv") {
+            let filteredChannels = tvChannels;
+
+            // Filtro per categoria/genre
+            if (extra && extra.genre) {
+                const genreMap: { [key: string]: string } = {
+                    "RAI": "rai",
+                    "Mediaset": "mediaset",
+                    "Sky": "sky",
+                    "Bambini": "kids",
+                    "News": "news",
+                    "Sport": "sport",
+                    "Cinema": "movies",
+                    "Generali": "general",
+                    "Documentari": "documentari"
+                };
+                const targetCategory = genreMap[extra.genre];
+                if (targetCategory) {
+                    filteredChannels = tvChannels.filter((channel: any) => {
+                        const categories = getChannelCategories(channel);
+                        return categories.includes(targetCategory);
+                    });
+                }
+            }
+
+            // Prepara i metadati per Stremio
+            const tvChannelsWithPrefix = filteredChannels.map((channel: any) => ({
+                ...channel,
+                id: `tv:${channel.id}`,
+                posterShape: "landscape",
+                poster: channel.poster || channel.logo || '',
+                logo: channel.logo || channel.poster || '',
+                background: channel.background || channel.poster || ''
+            }));
+
+            return { metas: tvChannelsWithPrefix };
+        }
+        return { metas: [] };
+    });
+
     return builder;
 }
 
