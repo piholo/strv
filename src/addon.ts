@@ -744,14 +744,28 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                     try {
                         const animeUnityProvider = new AnimeUnityProvider(animeUnityConfig);
                         let animeUnityResult;
+                        let seasonNumber: number | null = null;
+                        let episodeNumber: number | null = null;
+                        let isMovie = false;
+                        if (id.startsWith('tt') || id.startsWith('tmdb:')) {
+                            const parts = id.split(':');
+                            if (parts.length === 1) {
+                                isMovie = true;
+                            } else if (parts.length === 2) {
+                                episodeNumber = parseInt(parts[1]);
+                            } else if (parts.length === 3) {
+                                seasonNumber = parseInt(parts[1]);
+                                episodeNumber = parseInt(parts[2]);
+                            }
+                        }
                         if (id.startsWith('kitsu:')) {
                             animeUnityResult = await animeUnityProvider.handleKitsuRequest(id);
                         } else if (id.startsWith('mal:')) {
                             animeUnityResult = await animeUnityProvider.handleMalRequest(id);
                         } else if (id.startsWith('tt')) {
-                            animeUnityResult = await animeUnityProvider.handleImdbRequest(id);
+                            animeUnityResult = await animeUnityProvider.handleImdbRequest(id, seasonNumber, episodeNumber, isMovie);
                         } else if (id.startsWith('tmdb:')) {
-                            animeUnityResult = await animeUnityProvider.handleTmdbRequest(id.replace('tmdb:', ''));
+                            animeUnityResult = await animeUnityProvider.handleTmdbRequest(id.replace('tmdb:', ''), seasonNumber, episodeNumber, isMovie);
                         }
                         if (animeUnityResult && animeUnityResult.streams) {
                             allStreams.push(...animeUnityResult.streams.map(s => ({ ...s, name: 'StreamViX AU' })));
@@ -766,14 +780,28 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                         const { AnimeSaturnProvider } = await import('./providers/animesaturn-provider');
                         const animeSaturnProvider = new AnimeSaturnProvider(animeSaturnConfig);
                         let animeSaturnResult;
+                        let seasonNumber: number | null = null;
+                        let episodeNumber: number | null = null;
+                        let isMovie = false;
+                        if (id.startsWith('tt') || id.startsWith('tmdb:')) {
+                            const parts = id.split(':');
+                            if (parts.length === 1) {
+                                isMovie = true;
+                            } else if (parts.length === 2) {
+                                episodeNumber = parseInt(parts[1]);
+                            } else if (parts.length === 3) {
+                                seasonNumber = parseInt(parts[1]);
+                                episodeNumber = parseInt(parts[2]);
+                            }
+                        }
                         if (id.startsWith('kitsu:')) {
                             animeSaturnResult = await animeSaturnProvider.handleKitsuRequest(id);
                         } else if (id.startsWith('mal:')) {
                             animeSaturnResult = await animeSaturnProvider.handleMalRequest(id);
                         } else if (id.startsWith('tt')) {
-                            animeSaturnResult = await animeSaturnProvider.handleImdbRequest(id);
+                            animeSaturnResult = await animeSaturnProvider.handleImdbRequest(id, seasonNumber, episodeNumber, isMovie);
                         } else if (id.startsWith('tmdb:')) {
-                            animeSaturnResult = await animeSaturnProvider.handleTmdbRequest(id.replace('tmdb:', ''));
+                            animeSaturnResult = await animeSaturnProvider.handleTmdbRequest(id.replace('tmdb:', ''), seasonNumber, episodeNumber, isMovie);
                         }
                         if (animeSaturnResult && animeSaturnResult.streams) {
                             allStreams.push(...animeSaturnResult.streams.map(s => ({ ...s, name: 'StreamViX AS' })));
