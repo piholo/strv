@@ -28,7 +28,6 @@ interface AddonConfig {
   mfpProxyUrl?: string;
   mfpProxyPassword?: string;
   tvProxyUrl?: string;
-  epgEnabled?: string; // AGGIUNTA: Opzione EPG
   [key: string]: any;
 }
 
@@ -149,12 +148,6 @@ const baseManifest: Manifest = {
             key: "tvProxyUrl",
             title: "TV Proxy URL",
             type: "text"
-        },
-        // AGGIUNTA: Opzione EPG
-        {
-            key: "epgEnabled",
-            title: "Abilita EPG (Guida programmi)",
-            type: "checkbox"
         }
     ]
 };
@@ -287,8 +280,6 @@ function parseConfigFromArgs(args: any): AddonConfig {
 // Carica canali TV e domini da file esterni
 let tvChannels: any[] = [];
 let domains: any = {};
-let epgConfig: any = {};
-let epgManager: EPGManager | null = null;
 
 // ✅ DICHIARAZIONE delle variabili globali del builder
 let globalBuilder: any;
@@ -423,7 +414,6 @@ try {
     
     tvChannels = JSON.parse(fs.readFileSync(path.join(__dirname, '../config/tv_channels.json'), 'utf-8'));
     domains = JSON.parse(fs.readFileSync(path.join(__dirname, '../config/domains.json'), 'utf-8'));
-    epgConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../config/epg_config.json'), 'utf-8'));
     
     console.log(`✅ Loaded ${tvChannels.length} TV channels`);
     
@@ -670,27 +660,6 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                     background: (channel as any).background || (channel as any).poster || ''
                 };
                 
-                // Aggiungi EPG nel catalogo SOLO se abilitato
-                if (isEpgEnabled() && epgManager) {
-                    try {
-                        const epgChannelIds = (channel as any).epgChannelIds;
-                        const epgChannelId = epgManager.findEPGChannelId(channel.name, epgChannelIds);
-                        
-                        if (epgChannelId) {
-                            const currentProgram = await epgManager.getCurrentProgram(epgChannelId);
-                            
-                            if (currentProgram) {
-                                const startTime = epgManager.formatTime(currentProgram.start);
-                                const endTime = currentProgram.stop ? epgManager.formatTime(currentProgram.stop) : '';
-                                const epgInfo = `🔴 ORA: ${currentProgram.title} (${startTime}${endTime ? `-${endTime}` : ''})`;
-                                channelWithPrefix.description = `${channel.description || ''}\n\n${epgInfo}`;
-                            }
-                        }
-                    } catch (epgError) {
-                        console.error(`❌ Catalog: EPG error for ${channel.name}:`, epgError);
-                    }
-                }
-                
                 return channelWithPrefix;
             }));
             
@@ -738,43 +707,6 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                     country: "IT",
                     language: "it"
                 };
-                
-                // Aggiungi EPG nel meta SOLO se abilitato
-                if (isEpgEnabled() && epgManager) {
-                    try {
-                        const epgChannelIds = (channel as any).epgChannelIds;
-                        const epgChannelId = epgManager.findEPGChannelId(channel.name, epgChannelIds);
-                        
-                        if (epgChannelId) {
-                            const currentProgram = await epgManager.getCurrentProgram(epgChannelId);
-                            const nextProgram = await epgManager.getNextProgram(epgChannelId);
-                            
-                            let epgDescription = channel.description || '';
-                            
-                            if (currentProgram) {
-                                const startTime = epgManager.formatTime(currentProgram.start);
-                                const endTime = currentProgram.stop ? epgManager.formatTime(currentProgram.stop) : '';
-                                epgDescription += `\n\n🔴 IN ONDA ORA (${startTime}${endTime ? `-${endTime}` : ''}): ${currentProgram.title}`;
-                                if (currentProgram.description) {
-                                    epgDescription += `\n${currentProgram.description}`;
-                                }
-                            }
-                            
-                            if (nextProgram) {
-                                const nextStartTime = epgManager.formatTime(nextProgram.start);
-                                const nextEndTime = nextProgram.stop ? epgManager.formatTime(nextProgram.stop) : '';
-                                epgDescription += `\n\n⏭️ A SEGUIRE (${nextStartTime}${nextEndTime ? `-${nextEndTime}` : ''}): ${nextProgram.title}`;
-                                if (nextProgram.description) {
-                                    epgDescription += `\n${nextProgram.description}`;
-                                }
-                            }
-                            
-                            metaWithPrefix.description = epgDescription;
-                        }
-                    } catch (epgError) {
-                        console.error(`❌ Meta: EPG error for ${channel.name}:`, epgError);
-                    }
-                }
                 
                 return { meta: metaWithPrefix };
             } else {
@@ -1178,27 +1110,6 @@ function createBuilder(initialConfig: AddonConfig = {}) {
     return builder;
 }
 
-// Funzione per determinare se EPG è abilitato (query string > config > default)
-function isEpgEnabled(req?: Request): boolean {
-    function normalize(val: any): boolean {
-        if (Array.isArray(val)) val = val[0];
-        if (typeof val === 'undefined') return true; // default ON
-        if (val === true || val === '1' || val === 1 || val === 'true' || val === 'on') return true;
-        if (val === false || val === '0' || val === 0 || val === 'false' || val === 'off') return false;
-        return Boolean(val);
-    }
-    // 1. Query string
-    if (req && req.query && typeof req.query.epg !== 'undefined') {
-        return normalize(req.query.epg);
-    }
-    // 2. Config globale
-    if (typeof configCache.epgEnabled !== 'undefined') {
-        return normalize(configCache.epgEnabled);
-    }
-    // 3. Default: abilitato
-    return true;
-}
-
 // Server Express
 const app = express();
 
@@ -1351,27 +1262,6 @@ builder.defineCatalogHandler(async ({ type, id, extra }: { type: string; id: str
                 background: (channel as any).background || (channel as any).poster || ''
             };
             
-            // Aggiungi EPG nel catalogo SOLO se abilitato
-            if (isEpgEnabled() && epgManager) {
-                try {
-                    const epgChannelIds = (channel as any).epgChannelIds;
-                    const epgChannelId = epgManager.findEPGChannelId(channel.name, epgChannelIds);
-                    
-                    if (epgChannelId) {
-                        const currentProgram = await epgManager.getCurrentProgram(epgChannelId);
-                        
-                        if (currentProgram) {
-                            const startTime = epgManager.formatTime(currentProgram.start);
-                            const endTime = currentProgram.stop ? epgManager.formatTime(currentProgram.stop) : '';
-                            const epgInfo = `🔴 ORA: ${currentProgram.title} (${startTime}${endTime ? `-${endTime}` : ''})`;
-                            channelWithPrefix.description = `${channel.description || ''}\n\n${epgInfo}`;
-                        }
-                    }
-                } catch (epgError) {
-                    console.error(`❌ Catalog: EPG error for ${channel.name}:`, epgError);
-                }
-            }
-            
             return channelWithPrefix;
         }));
         
@@ -1419,43 +1309,6 @@ builder.defineMetaHandler(async ({ type, id }: { type: string; id: string }) => 
                 country: "IT",
                 language: "it"
             };
-            
-            // Aggiungi EPG nel meta SOLO se abilitato
-            if (isEpgEnabled() && epgManager) {
-                try {
-                    const epgChannelIds = (channel as any).epgChannelIds;
-                    const epgChannelId = epgManager.findEPGChannelId(channel.name, epgChannelIds);
-                    
-                    if (epgChannelId) {
-                        const currentProgram = await epgManager.getCurrentProgram(epgChannelId);
-                        const nextProgram = await epgManager.getNextProgram(epgChannelId);
-                        
-                        let epgDescription = channel.description || '';
-                        
-                        if (currentProgram) {
-                            const startTime = epgManager.formatTime(currentProgram.start);
-                            const endTime = currentProgram.stop ? epgManager.formatTime(currentProgram.stop) : '';
-                            epgDescription += `\n\n🔴 IN ONDA ORA (${startTime}${endTime ? `-${endTime}` : ''}): ${currentProgram.title}`;
-                            if (currentProgram.description) {
-                                epgDescription += `\n${currentProgram.description}`;
-                            }
-                        }
-                        
-                        if (nextProgram) {
-                            const nextStartTime = epgManager.formatTime(nextProgram.start);
-                            const nextEndTime = nextProgram.stop ? epgManager.formatTime(nextProgram.stop) : '';
-                            epgDescription += `\n\n⏭️ A SEGUIRE (${nextStartTime}${nextEndTime ? `-${nextEndTime}` : ''}): ${nextProgram.title}`;
-                            if (nextProgram.description) {
-                                epgDescription += `\n${nextProgram.description}`;
-                            }
-                        }
-                        
-                        metaWithPrefix.description = epgDescription;
-                    }
-                } catch (epgError) {
-                    console.error(`❌ Meta: EPG error for ${channel.name}:`, epgError);
-                }
-            }
             
             return { meta: metaWithPrefix };
         } else {
