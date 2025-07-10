@@ -770,31 +770,37 @@ function createBuilder(initialConfig: AddonConfig = {}) {
             }
             // Film/Serie (tt..., tmdb:...)
             if ((id.startsWith('tt') || id.startsWith('tmdb:'))) {
-                // 1. Prova VixSrc
+                console.log(`[VixSrc] Tentativo VixSrc per ID: ${id}, type: ${type}`);
                 const finalConfig: ExtractorConfig = {
                     tmdbApiKey: config.tmdbApiKey || process.env.TMDB_API_KEY,
                     mfpUrl: config.mediaFlowProxyUrl || process.env.MFP_URL,
                     mfpPsw: config.mediaFlowProxyPassword || process.env.MFP_PSW,
                     bothLink: bothLinkValue
                 };
-                const res: VixCloudStreamInfo[] | null = await getStreamContent(id, type, finalConfig);
-                let vixStreams: Stream[] = [];
-                if (res) {
-                    for (const st of res) {
-                        if (st.streamUrl == null) continue;
-                        vixStreams.push({
-                            title: st.name,
-                            name: 'StreamViX Vx',
-                            url: st.streamUrl,
-                            behaviorHints: {
-                                notWebReady: true,
-                                headers: { "Referer": st.referer },
-                            },
-                        });
+                try {
+                    const res: VixCloudStreamInfo[] | null = await getStreamContent(id, type, finalConfig);
+                    console.log(`[VixSrc] Risultato getStreamContent:`, res);
+                    let vixStreams: Stream[] = [];
+                    if (res) {
+                        for (const st of res) {
+                            if (st.streamUrl == null) continue;
+                            vixStreams.push({
+                                title: st.name,
+                                name: 'StreamViX Vx',
+                                url: st.streamUrl,
+                                behaviorHints: {
+                                    notWebReady: true,
+                                    headers: { "Referer": st.referer },
+                                },
+                            });
+                        }
                     }
-                }
-                if (vixStreams.length > 0) {
-                    return { streams: vixStreams };
+                    console.log(`[VixSrc] Streams trovati:`, vixStreams.length);
+                    if (vixStreams.length > 0) {
+                        return { streams: vixStreams };
+                    }
+                } catch (err) {
+                    console.error('[VixSrc] Errore getStreamContent:', err);
                 }
                 // 2. Se VixSrc non trova nulla, prova AnimeUnity/AnimeSaturn (se abilitati)
                 if (animeUnityEnabled || animeSaturnEnabled) {
